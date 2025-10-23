@@ -12,6 +12,7 @@ const (
 	MoveOutcomeSamePlayer MoveOutcome = iota
 	MoveOutComeSafe
 	MoveOutcomeMakeWar
+	MoveOutcomeNotInvolved
 )
 
 func (gs *GameState) HandleMove(move ArmyMove) MoveOutcome {
