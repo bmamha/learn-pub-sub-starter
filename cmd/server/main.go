@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/bmamha/learn-pub-sub-starter/internal/gamelogic"
 	"github.com/bmamha/learn-pub-sub-starter/internal/pubsub"
@@ -25,11 +26,10 @@ func main() {
 	}
 
 	defer ch.Close()
-	_, queue, err := pubsub.DeclareAndBind(conn, routing.ExchangePerilTopic, routing.GameLogSlug, "game_logs.*", pubsub.DurableQueue)
+	err = pubsub.Subscribe(conn, routing.ExchangePerilTopic, routing.GameLogSlug, routing.GameLogSlug+".*", pubsub.TransientQueue, logHandler(), pubsub.DecodeGob)
 	if err != nil {
-		fmt.Printf("Failed to open a channel: %v\n", err)
+		log.Fatalf("Failed to subscribe to game logs: %v", err)
 	}
-	fmt.Printf("Queue Name: %s\n", queue.Name)
 	gamelogic.PrintServerHelp()
 	for {
 		words := gamelogic.GetInput()
@@ -48,6 +48,7 @@ func main() {
 			return
 		default:
 			fmt.Println("Unknown command. Possible commands are: pause, resume, quit, help")
+			continue
 		}
 
 	}

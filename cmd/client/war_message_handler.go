@@ -9,9 +9,9 @@ import (
 	"github.com/bmamha/learn-pub-sub-starter/internal/routing"
 )
 
-type LogPublisher func(exchange, routingKey string, body routing.GameLog) error
+type logPublisher func(exchange, routingKey string, body routing.GameLog) error
 
-func warHandler(gs *gamelogic.GameState, pub LogPublisher, username string) func(gamelogic.RecognitionOfWar) pubsub.AckType {
+func warHandler(gs *gamelogic.GameState, pub logPublisher, username string) func(gamelogic.RecognitionOfWar) pubsub.AckType {
 	return func(rw gamelogic.RecognitionOfWar) pubsub.AckType {
 		defer fmt.Print("> ")
 		outcome, winner, loser := gs.HandleWar(rw)
@@ -26,6 +26,7 @@ func warHandler(gs *gamelogic.GameState, pub LogPublisher, username string) func
 				routing.GameLogSlug+"."+username,
 				routing.GameLog{CurrentTime: time.Now(), Message: fmt.Sprintf("%s won a war against %s.", winner, loser), Username: username})
 			if err != nil {
+				fmt.Println("Error publishing war log:", err)
 				return pubsub.NackRequeue
 			}
 
@@ -35,6 +36,7 @@ func warHandler(gs *gamelogic.GameState, pub LogPublisher, username string) func
 				routing.GameLogSlug+"."+username,
 				routing.GameLog{CurrentTime: time.Now(), Message: fmt.Sprintf("%s won a war against %s.", winner, loser), Username: username})
 			if err != nil {
+				fmt.Println("Error publishing war log:", err)
 				return pubsub.NackRequeue
 			}
 			return pubsub.Ack
@@ -43,6 +45,7 @@ func warHandler(gs *gamelogic.GameState, pub LogPublisher, username string) func
 				routing.GameLogSlug+"."+username,
 				routing.GameLog{CurrentTime: time.Now(), Message: fmt.Sprintf("A war between %s and %s resulted in a draw", winner, loser), Username: username})
 			if err != nil {
+				fmt.Println("Error publishing war log:", err)
 				return pubsub.NackRequeue
 			}
 

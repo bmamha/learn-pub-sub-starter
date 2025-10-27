@@ -27,12 +27,13 @@ func main() {
 
 	pauseQueue := routing.PauseKey + "." + user
 	gameState := gamelogic.NewGameState(user)
-	err = pubsub.SubscribeJSON(conn,
+	err = pubsub.Subscribe(conn,
 		routing.ExchangePerilDirect,
 		pauseQueue,
 		routing.PauseKey,
 		pubsub.TransientQueue,
-		handlerPause(gameState))
+		handlerPause(gameState),
+		pubsub.Unmarshal)
 	if err != nil {
 		log.Fatalf("Failed to subscribe to pause messages: %v", err)
 	}
@@ -45,12 +46,14 @@ func main() {
 		return pubsub.PublishJSON(ch, exchange, routingKey, body)
 	}
 
-	err = pubsub.SubscribeJSON(conn,
+	// Client detects army moves
+	err = pubsub.Subscribe(conn,
 		routing.ExchangePerilTopic,
 		"army_moves."+user,
 		"army_moves.*",
 		pubsub.TransientQueue,
-		handlerMove(gameState, pub, user))
+		handlerMove(gameState, pub, user),
+		pubsub.Unmarshal)
 	if err != nil {
 		log.Fatalf("Failed to declare and bind army moves queue: %v", err)
 	}
@@ -62,12 +65,15 @@ func main() {
 		}
 		return pubsub.PublishGob(ch, exchange, routingKey, logBody)
 	}
-	err = pubsub.SubscribeJSON(conn,
+
+	// Client recognizes wars
+	err = pubsub.Subscribe(conn,
 		routing.ExchangePerilTopic,
 		routing.WarRecognitionsPrefix,
 		routing.WarRecognitionsPrefix+".*",
 		pubsub.DurableQueue,
-		warHandler(gameState, pubLog, user))
+		warHandler(gameState, pubLog, user),
+		pubsub.Unmarshal)
 	if err != nil {
 		log.Fatalf("Failed to declare and bind war recognitions queue: %v", err)
 	}
