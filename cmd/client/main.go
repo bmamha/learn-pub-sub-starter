@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"log"
+	"strconv"
+	"time"
 
 	"github.com/bmamha/learn-pub-sub-starter/internal/gamelogic"
 	"github.com/bmamha/learn-pub-sub-starter/internal/pubsub"
@@ -19,6 +21,11 @@ func main() {
 	}
 
 	defer conn.Close()
+
+	publishCh, err := conn.Channel()
+	if err != nil {
+		fmt.Printf("Failed to open a publish channel: %v\n", err)
+	}
 
 	user, err := gamelogic.ClientWelcome()
 	if err != nil {
@@ -38,32 +45,16 @@ func main() {
 		log.Fatalf("Failed to subscribe to pause messages: %v", err)
 	}
 
-	pub := func(exchange, routingKey string, body any) error {
-		ch, err := conn.Channel()
-		if err != nil {
-			return err
-		}
-		return pubsub.PublishJSON(ch, exchange, routingKey, body)
-	}
-
 	// Client detects army moves
 	err = pubsub.Subscribe(conn,
 		routing.ExchangePerilTopic,
 		"army_moves."+user,
 		"army_moves.*",
 		pubsub.TransientQueue,
-		handlerMove(gameState, pub, user),
+		handlerMove(gameState, publishCh),
 		pubsub.Unmarshal)
 	if err != nil {
 		log.Fatalf("Failed to declare and bind army moves queue: %v", err)
-	}
-
-	pubLog := func(exchange, routingKey string, logBody routing.GameLog) error {
-		ch, err := conn.Channel()
-		if err != nil {
-			return err
-		}
-		return pubsub.PublishGob(ch, exchange, routingKey, logBody)
 	}
 
 	// Client recognizes wars
@@ -72,7 +63,7 @@ func main() {
 		routing.WarRecognitionsPrefix,
 		routing.WarRecognitionsPrefix+".*",
 		pubsub.DurableQueue,
-		warHandler(gameState, pubLog, user),
+		warHandler(gameState, publishCh),
 		pubsub.Unmarshal)
 	if err != nil {
 		log.Fatalf("Failed to declare and bind war recognitions queue: %v", err)
@@ -102,6 +93,7 @@ func main() {
 				fmt.Printf("Failed to open a channel: %v\n", err)
 				continue
 			}
+			defer ch.Close()
 			pubsub.PublishJSON(ch, routing.ExchangePerilTopic, "army_moves."+user, am)
 
 		case "status":
@@ -109,7 +101,28 @@ func main() {
 		case "help":
 			gamelogic.PrintClientHelp()
 		case "spam":
-			fmt.Println("Spamming not allowed")
+			if len(words) < 2 {
+				fmt.Println("A second argument is required for spam command")
+				continue
+			}
+
+			n, err := strconv.Atoi(words[1])
+			if err != nil {
+				fmt.Printf("Second argument  is not an integer: %v\n", err)
+				continue
+			} // Output: '123' is an integer
+			spamChannel, err := conn.Channel()
+			if err != nil {
+				fmt.Printf("Failed to open a spam channel: %v\n", err)
+			}
+			for n > 0 {
+				msg := gamelogic.GetMaliciousLog()
+				err := pubsub.PublishGob(spamChannel, routing.ExchangePerilTopic, routing.GameLogSlug+"."+user, routing.GameLog{CurrentTime: time.Now(), Message: msg, Username: user})
+				if err != nil {
+					fmt.Printf("Failed to publish spam log: %v\n", err)
+				}
+				n--
+			}
 		case "quit":
 			gamelogic.PrintQuit()
 			return
